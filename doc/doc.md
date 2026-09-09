@@ -27,6 +27,30 @@ cd ~/Документы/projects/Multsites
 # Скопировать шаблон
 cp docker/nginx/site-template.conf docker/nginx/newsite.ru.conf
 
+-----------------------------------------------------------------------
+
+# 1. Создать БД
+docker exec -it multi_db psql -U laravel -c "CREATE DATABASE client_db;"
+
+# 2. Скопировать проект
+cp -r sites/starscy.ru sites/client-site
+
+# 3. Настроить .env
+cd sites/client-site
+sed -i 's/APP_NAME=.*/APP_NAME="Client Site"/' .env
+sed -i 's/APP_URL=.*/APP_URL=http:\/\/127.0.0.1:8001/' .env
+sed -i 's/DB_DATABASE=.*/DB_DATABASE=client_db/' .env
+
+# 4. Создать конфиг nginx
+cp docker/nginx/starscy.ru.conf docker/nginx/client-site.conf
+sed -i 's/starscy.ru/client-site/g' docker/nginx/client-site.conf
+
+# 5. Запустить миграции
+docker exec -it multi_app bash -c "cd /var/www/html/sites/client-site && php artisan migrate --force"
+
+# 6. Перезапустить nginx
+docker exec -it multi_app nginx -s reload
+
 # Заменить {SITE_NAME} на имя сайта
 sed -i 's/{SITE_NAME}/newsite.ru/g' docker/nginx/newsite.ru.conf
 Шаг 5: Запустить миграции

@@ -1,0 +1,46 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: multi_app
+    restart: unless-stopped
+    volumes:
+      - ./sites:/var/www/html/sites
+      - ./docker/nginx:/etc/nginx/conf.d
+      - ./docker/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+      - ./docker/entrypoint.sh:/entrypoint.sh
+    ports:
+      - "8000:80"
+    entrypoint: ["/entrypoint.sh"]
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=db
+      - DB_PORT=5432
+
+  db:
+    image: postgres:15-alpine
+    container_name: multi_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: laravel
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: multi_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
+
+volumes:
+  postgres_data:
+  redis_data:

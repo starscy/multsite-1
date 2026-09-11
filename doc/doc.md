@@ -74,3 +74,26 @@ bash
 curl -I http://127.0.0.1:8000
 # или
 curl -I http://newsite.ru:8000
+
+..........................
+
+1. Правите в landing-engine/
+2. git commit + push (для истории)
+3. cd ~/Документы/projects/Multsites
+   ./deploy/build-local.sh --site=starscy.ru
+
+   Что делает build-local.sh:
+    - npm run build в landing-engine/  (ASSET_URL из sites.conf)
+    - rsync landing-engine/ → сервер:sites/starscy.ru/
+      (исключая .env, storage, vendor, node_modules, .git)
+    - scp public/build → сервер → docker cp в контейнер
+    - ssh → deploy/deploy-server.sh --site=starscy.ru
+
+4. deploy-server.sh на сервере:
+    - распаковка public/build
+    - composer install (если надо)
+    - php artisan migrate --force
+    - chown www-data
+    - storage:link (если нет)
+    - optimize:clear
+    - nginx -s reload

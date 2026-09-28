@@ -1,5 +1,7 @@
 # Локально, в landing-engine/
 ./deploy/build-local.sh --site=starscy.ru
+./deploy/build-local.sh --site=demo.starscy.ru
+./deploy/build-local.sh --site=wedding.starscy.ru
 
 # Деплой нескольких
 ./deploy/build-local.sh --site=starscy.ru --site=site2.ru

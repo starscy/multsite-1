@@ -42,12 +42,12 @@ services:
     command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
 
   worker:
-    image: multisites-1-app
+    image: multsites-app
     container_name: multi_worker
     restart: unless-stopped
+    entrypoint: [ "sh", "-c" ]
     volumes:
       - ./sites:/var/www/html/sites
-      - ./docker/entrypoint.sh:/entrypoint.sh
     depends_on:
       - db
       - redis
@@ -61,9 +61,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - QUEUE_CONNECTION=redis
-    command: >
-      sh -c "cd /var/www/html/sites/wedding.starscy.ru &&
-             php artisan queue:work --queue=default --sleep=3 --tries=3 --max-time=3600"
+    command:
+      - "cd /var/www/html/sites/wedding.starscy.ru && exec php artisan queue:work --queue=default --sleep=3 --tries=3 --max-time=3600"
     deploy:
       resources:
         limits:

@@ -42,7 +42,9 @@ services:
     command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
 
   worker:
-    image: multsites-app
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: multi_worker
     restart: unless-stopped
     entrypoint: [ "sh", "-c" ]

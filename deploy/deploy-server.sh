@@ -79,6 +79,15 @@ for site in "${SELECTED_SITES[@]}"; do
         }
     fi
 
+    # ==========================================
+    # Сброс bootstrap-кэша (ДО composer install)
+    # ==========================================
+    log "${YELLOW}  → сброс bootstrap-кэша (перед composer)${NC}"
+    docker exec "$CONTAINER" bash -c "
+        cd $SITE_PATH
+        rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php
+    " || true
+
     # Composer install
     if [ "$SKIP_COMPOSER" != "1" ]; then
         log "${YELLOW}  → composer install (проверка)${NC}"
@@ -95,6 +104,16 @@ for site in "${SELECTED_SITES[@]}"; do
             " || log "${YELLOW}  ⚠️ composer warning${NC}"
         }
     fi
+
+    # ==========================================
+    # Сброс bootstrap-кэша (ПОСЛЕ composer install)
+    # ==========================================
+    log "${YELLOW}  → сброс bootstrap-кэша (после composer)${NC}"
+    docker exec "$CONTAINER" bash -c "
+        cd $SITE_PATH
+        rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php
+        php artisan package:discover --ansi 2>&1 | tail -5
+    " || log "${YELLOW}  ⚠️ package:discover warning${NC}"
 
     # Миграции
     if [ "$SKIP_MIGRATE" != "1" ]; then
@@ -137,6 +156,8 @@ for site in "${SELECTED_SITES[@]}"; do
             php artisan config:clear
             php artisan cache:clear
             php artisan route:clear
+            php artisan event:clear
+            php artisan optimize:clear
         " > /dev/null 2>&1 || true
     fi
 

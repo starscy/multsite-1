@@ -19,3 +19,12 @@
 # На сервере
 cd /var/www/multisites-1
 ./deploy/deploy-server.sh --site=starscy.ru
+
+после деплоя на сервере запустить:
+
+docker exec multi_app bash -c "
+cd /var/www/html/sites/wedding.starscy.ru
+rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php
+php artisan package:discover --ansi
+"
+

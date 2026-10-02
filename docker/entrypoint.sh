@@ -1,93 +1,88 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Starting multi-site initialization..."
+echo "🚀 Multi-site initialization..."
 
-# Создаем все необходимые папки с правильными правами
-mkdir -p /run/nginx
-chown -R www-data:www-data /run/nginx
-chmod -R 755 /run/nginx
+# Создаём все необходимые папки
+mkdir -p /run/nginx /var/run /var/run/supervisor /var/log/supervisor \
+         /var/lib/nginx/body /var/log/nginx /var/run/php
+chown -R www-data:www-data /run/nginx /var/run /var/run/supervisor \
+                            /var/log/supervisor /var/lib/nginx /var/log/nginx /var/run/php
+chmod -R 755 /run/nginx /var/run /var/run/supervisor /var/log/supervisor \
+              /var/lib/nginx /var/log/nginx /var/run/php
 
-mkdir -p /var/run
-chown -R www-data:www-data /var/run
-chmod -R 755 /var/run
-
-mkdir -p /var/run/supervisor
-chown -R www-data:www-data /var/run/supervisor
-chmod -R 755 /var/run/supervisor
-
-mkdir -p /var/log/supervisor
-chown -R www-data:www-data /var/log/supervisor
-
-mkdir -p /var/lib/nginx/body
-chown -R www-data:www-data /var/lib/nginx
-chmod -R 755 /var/lib/nginx
-
-mkdir -p /var/log/nginx
-chown -R www-data:www-data /var/log/nginx
-
-mkdir -p /var/run/php
-chown -R www-data:www-data /var/run/php
-
-# Проверяем папку sites
 if [ ! -d "/var/www/html/sites" ]; then
-    echo "❌ Directory /var/www/html/sites not found!"
+    echo "❌ /var/www/html/sites не найден, создаём..."
     mkdir -p /var/www/html/sites
 fi
 
-echo "📂 Sites directory contents:"
+echo "📂 Сайты:"
 ls -la /var/www/html/sites/
 
-# Перебираем все папки в /var/www/html/sites
+# Перебираем все сайты
 for site_dir in /var/www/html/sites/*/; do
     [ -d "$site_dir" ] || continue
 
     site_name=$(basename "$site_dir")
-    echo "📦 Processing site: $site_name"
 
-    if [ -f "$site_dir/.env" ]; then
-        echo "✅ Found .env for $site_name"
-
-        if [ ! -f "$site_dir/.initialized" ]; then
-            echo "🔧 Initializing $site_name..."
-
-            cd "$site_dir"
-
-            if [ -f "composer.json" ]; then
-                echo "📦 Installing composer dependencies..."
-                composer install --optimize-autoloader --no-interaction --no-scripts || true
-            fi
-
-            if ! grep -q "APP_KEY=" .env || grep -q "APP_KEY=$" .env; then
-                echo "🔑 Generating APP_KEY..."
-                php artisan key:generate || true
-            fi
-
-            if [ ! -L "public/storage" ]; then
-                php artisan storage:link || true
-            fi
-
-            echo "📊 Running migrations..."
-            php artisan migrate --force || true
-
-            php artisan config:clear
-            php artisan cache:clear
-            php artisan view:clear
-            php artisan route:clear
-
-            composer dump-autoload --optimize || true
-
-            touch "$site_dir/.initialized"
-        else
-            echo "⏭️ $site_name already initialized"
-        fi
-    else
-        echo "❌ No .env found for $site_name, skipping..."
+    # Пропускаем шаблон (если он есть)
+    if [ "$site_name" = "_template" ]; then
+        echo "⏭️ Пропускаем шаблон: $site_name"
+        continue
     fi
+
+    echo "📦 Обработка: $site_name"
+
+    if [ ! -f "$site_dir/.env" ]; then
+        echo "❌ Нет .env для $site_name — пропускаем"
+        continue
+    fi
+
+    # Если уже инициализирован — пропускаем
+    if [ -f "$site_dir/.initialized" ]; then
+        echo "⏭️ $site_name уже инициализирован"
+        continue
+    fi
+
+    echo "🔧 Инициализация $site_name..."
+    cd "$site_dir"
+
+    # Composer install (только если vendor отсутствует)
+    if [ -f "composer.json" ] && [ ! -d "vendor" ]; then
+        echo "📦 Устанавливаем composer..."
+        composer install --optimize-autoloader --no-interaction --no-scripts || true
+    fi
+
+    # APP_KEY
+    if ! grep -q "^APP_KEY=base64:" .env; then
+        echo "🔑 Генерируем APP_KEY..."
+        php artisan key:generate --force || true
+    fi
+
+    # storage:link
+    if [ ! -L "public/storage" ]; then
+        php artisan storage:link || true
+    fi
+
+    # Миграции
+    echo "📊 Миграции..."
+    php artisan migrate --force || true
+
+    # Кэш
+    php artisan config:clear
+    php artisan cache:clear
+    php artisan view:clear
+    php artisan route:clear
+
+    composer dump-autoload --optimize || true
+
+    # Маркер
+    touch "$site_dir/.initialized"
+    echo "✅ $site_name готов"
 done
 
-echo "✅ Multi-site initialization completed!"
+echo "✅ Все сайты инициализированы"
 
-# Запускаем supervisor
-echo "🚀 Starting supervisor..."
+# Запуск Supervisor
+echo "🚀 Запуск Supervisor..."
 exec supervisord -n -c /etc/supervisor/conf.d/supervisord.conf

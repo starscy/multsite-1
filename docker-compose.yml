@@ -20,6 +20,8 @@ services:
       - DB_CONNECTION=pgsql
       - DB_HOST=db
       - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
   db:
     image: postgres:15-alpine
@@ -27,7 +29,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: laravel
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -39,17 +41,19 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
 
+  # 🆕 ОДИН воркер для всех сайтов (через Supervisor)
   worker:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: multi_worker
     restart: unless-stopped
-    entrypoint: [ "sh", "-c" ]
+    entrypoint: ["sh", "-c"]
     volumes:
       - ./sites:/var/www/html/sites
+      - ./docker/supervisord-worker.conf:/etc/supervisor/conf.d/supervisord.conf
     depends_on:
       - db
       - redis
@@ -57,18 +61,15 @@ services:
       - DB_CONNECTION=pgsql
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_DATABASE=wedding_db
-      - DB_USERNAME=laravel
-      - DB_PASSWORD=secret
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - QUEUE_CONNECTION=redis
     command:
-      - "cd /var/www/html/sites/wedding.starscy.ru && exec php artisan queue:work --queue=default --sleep=3 --tries=3 --max-time=3600"
+      - "supervisord -c /etc/supervisor/conf.d/supervisord.conf"
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 512M
 
 volumes:
   postgres_data:
